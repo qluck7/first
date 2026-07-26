@@ -82,7 +82,7 @@ try {
     Invoke-WebRequest -Uri $Url -UseBasicParsing -OutFile $Download
     $text = Get-Content $Download -Raw
     [void][scriptblock]::Create($text)
-    if ($text -notmatch "\$Version\s*=\s*'3\.1'") { throw 'Wrong supervisor version.' }
+    if ($text -notmatch '\$Version\s*=\s*''3\.1''') { throw 'Wrong supervisor version.' }
     Copy-Item -Force $Download $Target
     Remove-Item $Download -Force -ErrorAction SilentlyContinue
 
