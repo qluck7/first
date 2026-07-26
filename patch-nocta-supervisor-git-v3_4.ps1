@@ -11,6 +11,7 @@ $LaunchFile = 'C:\Nocta\control\agent\nocta-vps-agent-v1.ps1'
 $StateDir = 'C:\Nocta\control\supervisor-v3\state'
 $LogDir = 'C:\Nocta\logs\supervisor-v3'
 $Log = Join-Path $LogDir ("patch-git-v34-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 New-Item -ItemType Directory -Force -Path $StateDir,$LogDir | Out-Null
 Start-Transcript -Path $Log -Force | Out-Null
@@ -58,9 +59,11 @@ try {
 '@
 
     $new = @'
-    & cmd.exe /d /c "git -C \"$CollectorRepo\" fetch origin agent/moex-v62-segmented >nul 2>&1"
+    $gitFetchCommand = 'git -C "{0}" fetch origin agent/moex-v62-segmented >nul 2>&1' -f $CollectorRepo
+    & cmd.exe /d /c $gitFetchCommand
     if ($LASTEXITCODE -ne 0) { throw 'Collector branch fetch failed.' }
-    & cmd.exe /d /c "git -C \"$CollectorRepo\" reset --hard origin/agent/moex-v62-segmented >nul 2>&1"
+    $gitResetCommand = 'git -C "{0}" reset --hard origin/agent/moex-v62-segmented >nul 2>&1' -f $CollectorRepo
+    & cmd.exe /d /c $gitResetCommand
     if ($LASTEXITCODE -ne 0) { throw 'Collector branch reset failed.' }
 '@
 
@@ -72,7 +75,7 @@ try {
         }
         $text = $text.Replace($old,$new)
         $text = $text.Replace("`$Version = '3.1'","`$Version = '3.1.1'")
-        [IO.File]::WriteAllText($path,$text,(New-Object Text.UTF8Encoding($false)))
+        [IO.File]::WriteAllText($path,$text,$Utf8NoBom)
         [void][scriptblock]::Create((Get-Content $path -Raw))
     }
 
