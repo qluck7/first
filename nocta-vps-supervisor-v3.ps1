@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$Version = '3.0'
+$Version = '3.1'
 $Root = 'C:\Nocta'
 $ControlDir = Join-Path $Root 'control\supervisor-v3'
 $StateDir = Join-Path $ControlDir 'state'
@@ -62,7 +62,8 @@ function Invoke-Gh {
 
 function Post-Comment {
     param([Parameter(Mandatory)]$Payload)
-    $body = "```json`r`n$($Payload | ConvertTo-Json -Depth 40)`r`n```"
+    $json = $Payload | ConvertTo-Json -Depth 40
+    $body = '```json' + "`r`n" + $json + "`r`n" + '```'
     $file = Join-Path $StateDir ("comment-{0}.md" -f ([guid]::NewGuid().ToString('N')))
     Write-TextNoBom -Path $file -Text $body
     try { [void](Invoke-Gh -Arguments @('issue','comment',[string]$ControlIssue,'--repo',$RepoName,'--body-file',$file)) }
@@ -122,16 +123,19 @@ function Get-SegmentState {
     $manifest = Read-JsonFile -Path $manifestPath
     $validation = Read-JsonFile -Path $validationPath
     $bytes = 0
-    if (Test-Path $root) { $bytes = [int64]((Get-ChildItem $root -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum) }
+    if (Test-Path $root) {
+        $measurement = Get-ChildItem $root -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum
+        if ($measurement.Sum) { $bytes = [int64]$measurement.Sum }
+    }
     return [ordered]@{
         root=$root
         manifest_exists=[bool]$manifest
-        manifest_status=if($manifest){[string]$manifest.status}else{$null}
+        manifest_status=$(if($manifest){[string]$manifest.status}else{$null})
         validation_exists=[bool]$validation
-        validation_status=if($validation){[string]$validation.status}else{$null}
-        instrument_count=if($manifest){$manifest.instrument_count}else{$null}
-        candle_count=if($manifest){$manifest.candle_count}else{$null}
-        trading_dates=if($manifest){@($manifest.trading_dates)}else{@()}
+        validation_status=$(if($validation){[string]$validation.status}else{$null})
+        instrument_count=$(if($manifest){$manifest.instrument_count}else{$null})
+        candle_count=$(if($manifest){$manifest.candle_count}else{$null})
+        trading_dates=$(if($manifest){@($manifest.trading_dates)}else{@()})
         bytes=$bytes
         mib=[math]::Round($bytes/1MB,2)
     }
@@ -224,9 +228,10 @@ function Start-SegmentProcess {
 function Validate-Segment {
     param([Parameter(Mandatory)][string]$SegmentId)
     $output = Join-Path $SegmentsRoot $SegmentId
+    $log = Join-Path $LogDir ("validate-$SegmentId-$(Get-Date -Format yyyyMMdd-HHmmss).log")
     $oldPythonPath = $env:PYTHONPATH
     $env:PYTHONPATH = $CollectorRepo
-    try { & $Python -u (Join-Path $CollectorRepo 'tools\moex_v6_validate.py') --output $output 2>&1 | Tee-Object -FilePath (Join-Path $LogDir ("validate-$SegmentId-$(Get-Date -Format yyyyMMdd-HHmmss).log")) }
+    try { & $Python -u (Join-Path $CollectorRepo 'tools\moex_v6_validate.py') --output $output 2>&1 | Tee-Object -FilePath $log }
     finally { $env:PYTHONPATH = $oldPythonPath }
     if ($LASTEXITCODE -ne 0) { throw "Validation failed for $SegmentId with exit code $LASTEXITCODE" }
     $state = Get-SegmentState -SegmentId $SegmentId
@@ -246,9 +251,9 @@ function Publish-Status {
         observed_at=(Get-Date).ToUniversalTime().ToString('o')
         computer=$env:COMPUTERNAME
         segment_id=$segmentId
-        process_id=if($Context){$Context.process_id}else{$null}
-        checkpoint=if($segmentId){Get-CheckpointState -SegmentId $segmentId}else{$null}
-        segment_state=if($segmentId){Get-SegmentState -SegmentId $segmentId}else{$null}
+        process_id=$(if($Context){$Context.process_id}else{$null})
+        checkpoint=$(if($segmentId){Get-CheckpointState -SegmentId $segmentId}else{$null})
+        segment_state=$(if($segmentId){Get-SegmentState -SegmentId $segmentId}else{$null})
         extra=$Extra
     }
     Write-JsonFile -Path (Join-Path $StateDir 'latest.json') -Value $payload
@@ -298,17 +303,15 @@ function Run-ControlTask {
         }
 
         if (-not $process) {
-            $exitCode = $null
-            try { $ctxProcess = [System.Diagnostics.Process]::GetProcessById([int]$ctx.process_id); $exitCode = $ctxProcess.ExitCode } catch {}
             try {
                 $segmentState = Validate-Segment -SegmentId ([string]$ctx.segment_id)
-                [void](Publish-Status -Status 'PASS' -Task $Task -Context $ctx -Extra ([ordered]@{exit_code=$exitCode; validation=$segmentState}))
+                [void](Publish-Status -Status 'PASS' -Task $Task -Context $ctx -Extra ([ordered]@{validation=$segmentState}))
                 Write-JsonFile -Path (Join-Path $StateDir 'last-task.json') -Value ([ordered]@{task_id=[string]$Task.task_id;status='PASS';completed_at=(Get-Date).ToUniversalTime().ToString('o')})
             }
             catch {
                 $tailOut = if(Test-Path $ctx.stdout){@(Get-Content $ctx.stdout -Tail 80)}else{@()}
                 $tailErr = if(Test-Path $ctx.stderr){@(Get-Content $ctx.stderr -Tail 80)}else{@()}
-                [void](Publish-Status -Status 'FAIL' -Task $Task -Context $ctx -Extra ([ordered]@{exit_code=$exitCode;error=$_.Exception.Message;stdout_tail=$tailOut;stderr_tail=$tailErr}))
+                [void](Publish-Status -Status 'FAIL' -Task $Task -Context $ctx -Extra ([ordered]@{error=$_.Exception.Message;stdout_tail=$tailOut;stderr_tail=$tailErr}))
                 Write-JsonFile -Path (Join-Path $StateDir 'last-task.json') -Value ([ordered]@{task_id=[string]$Task.task_id;status='FAIL';completed_at=(Get-Date).ToUniversalTime().ToString('o')})
             }
             return
