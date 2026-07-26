@@ -70,7 +70,7 @@ try {
     Write-Host "`n=== Configuring Python toolchain ===" -ForegroundColor Cyan
     & py.exe -3.12 -m pip install --upgrade pip
     if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed: $LASTEXITCODE" }
-    & py.exe -3.12 -m pip install --upgrade requests pytest pyinstaller virtualenv psutil
+    & py.exe -3.12 -m pip install --upgrade requests pytest pyinstaller virtualenv psutil tzdata
     if ($LASTEXITCODE -ne 0) { throw "Python tooling install failed: $LASTEXITCODE" }
 
     Write-Host "`n=== Creating Nocta directory layout ===" -ForegroundColor Cyan
