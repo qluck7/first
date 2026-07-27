@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-reboot-vps-20260727-01",
+  "command_id": "oob-health-20260727-02",
   "enabled": true,
-  "action": "reboot",
+  "action": "health",
   "params": {
-    "reason": "Verify autonomous recovery after runner restart did not dispatch queued health job"
+    "reason": "Hold safe read-only state after autonomous-control bootstrap PASS"
   }
 }
