@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-health-after-codex-dispatch-20260727-01",
+  "command_id": "oob-restart-runner-20260727-04",
   "enabled": true,
-  "action": "health",
+  "action": "restart_runner",
   "params": {
-    "reason": "Return the out-of-band channel to a safe read-only state after runner recovery and Codex audit dispatch"
+    "reason": "Force a clean runner reconnect before verifying the queued Codex collector audit"
   }
 }
