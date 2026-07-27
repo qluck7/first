@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-health-20260727-02",
+  "command_id": "oob-restart-runner-20260727-03",
   "enabled": true,
-  "action": "health",
+  "action": "restart_runner",
   "params": {
-    "reason": "Hold safe read-only state after autonomous-control bootstrap PASS"
+    "reason": "Prepare a clean self-hosted runner before the Codex collector and ready-slice audit"
   }
 }
