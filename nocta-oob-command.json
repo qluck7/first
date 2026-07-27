@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-health-after-reboot-20260727-01",
+  "command_id": "oob-rdp-recovery-reboot-20260728-01",
   "enabled": true,
-  "action": "health",
+  "action": "reboot",
   "params": {
-    "reason": "Safe read-only state after controlled VPS reboot"
+    "reason": "RDP 0x204 after prior reboot; perform one controlled Windows restart through the installed SYSTEM OOB agent"
   }
 }
