@@ -46,12 +46,20 @@ function Get-Health {
     $workers = @(Get-Process -Name 'Runner.Worker' -ErrorAction SilentlyContinue)
     $network = $false
     try { $network = Test-NetConnection github.com -Port 443 -InformationLevel Quiet -WarningAction SilentlyContinue } catch {}
+    $oldestWorkerMinutes = $null
+    if ($workers.Count -gt 0) {
+        try {
+            $oldest = $workers | Sort-Object StartTime | Select-Object -First 1
+            $oldestWorkerMinutes = [math]::Round(((Get-Date) - $oldest.StartTime).TotalMinutes,1)
+        } catch {}
+    }
     return [ordered]@{
         service_name = if ($service) { $service.Name } else { $null }
         service_status = if ($service) { $service.Status.ToString() } else { 'MISSING' }
         service_start_type = if ($service) { $service.StartType.ToString() } else { $null }
         listener_processes = $listeners.Count
         worker_processes = $workers.Count
+        oldest_worker_minutes = $oldestWorkerMinutes
         github_443_reachable = [bool]$network
     }
 }
@@ -70,13 +78,33 @@ function Restart-Runner {
         $service.Refresh()
         $listeners = @(Get-Process -Name 'Runner.Listener' -ErrorAction SilentlyContinue)
         if ($service.Status -eq 'Running' -and $listeners.Count -gt 0) {
-            return [ordered]@{ killed_processes = $killed; health = Get-Health }
+            return [ordered]@{ action='RESTARTED_RUNNER'; killed_processes=$killed; health=Get-Health }
         }
     } while ((Get-Date) -lt $deadline)
     throw 'Runner service did not recover within 90 seconds.'
 }
 
+function Ensure-RunnerHealthy {
+    $service = Get-RunnerService
+    if (-not $service) {
+        return [ordered]@{ action='SERVICE_MISSING'; health=Get-Health }
+    }
+    try { Set-Service -Name $service.Name -StartupType Automatic } catch {}
+    $health = Get-Health
+    if ($health.oldest_worker_minutes -ne $null -and [double]$health.oldest_worker_minutes -gt 370) {
+        return Restart-Runner
+    }
+    if ($service.Status -ne 'Running') {
+        return Restart-Runner
+    }
+    if ([int]$health.listener_processes -eq 0 -and [int]$health.worker_processes -eq 0) {
+        return Restart-Runner
+    }
+    return [ordered]@{ action='NONE'; health=$health }
+}
+
 try {
+    $guardian = Ensure-RunnerHealthy
     $previous = $null
     if (Test-Path $StatePath) {
         try { $previous = Get-Content $StatePath -Raw | ConvertFrom-Json } catch {}
@@ -94,13 +122,15 @@ try {
             action=[string]$command.action
             status='SKIPPED_DISABLED'
             completed_at=[DateTimeOffset]::UtcNow.ToString('o')
+            guardian=$guardian
             health=Get-Health
         })
         exit 0
     }
 
     if ($previous -and [string]$previous.command_id -eq [string]$command.command_id -and
-        [string]$previous.status -in @('PASS','FAIL','SKIPPED_DISABLED')) {
+        [string]$previous.status -in @('PASS','FAIL','SKIPPED_DISABLED') -and
+        [string]$guardian.action -eq 'NONE') {
         exit 0
     }
 
@@ -110,6 +140,7 @@ try {
         action=[string]$command.action
         status='RUNNING'
         started_at=[DateTimeOffset]::UtcNow.ToString('o')
+        guardian=$guardian
         health=Get-Health
     })
 
@@ -126,12 +157,7 @@ try {
         }
         'restart_runner' { Restart-Runner }
         'kill_worker_and_restart' { Restart-Runner }
-        'run_local_guardian' {
-            $guardian = 'C:\Nocta\bin\NoctaRunnerGuardian.ps1'
-            if (-not (Test-Path $guardian)) { throw "Local guardian is missing: $guardian" }
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $guardian | Out-Null
-            Get-Health
-        }
+        'run_local_guardian' { Ensure-RunnerHealthy }
         'reboot' {
             $value = [ordered]@{ message='Windows reboot scheduled in 30 seconds.' }
             Write-State ([ordered]@{
@@ -140,6 +166,7 @@ try {
                 action=[string]$command.action
                 status='PASS'
                 completed_at=[DateTimeOffset]::UtcNow.ToString('o')
+                guardian=$guardian
                 details=$value
                 health=Get-Health
             })
@@ -155,6 +182,7 @@ try {
         action=[string]$command.action
         status='PASS'
         completed_at=[DateTimeOffset]::UtcNow.ToString('o')
+        guardian=$guardian
         details=$details
         health=Get-Health
     })
