@@ -32,6 +32,14 @@ function Get-RunnerService {
     return $service
 }
 
+function Stop-RunnerJobProcesses {
+    foreach ($name in @('Runner.Worker','Runner.Listener')) {
+        foreach ($process in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
+            try { & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null } catch {}
+        }
+    }
+}
+
 function Wait-RunnerOnline {
     param([int]$TimeoutSeconds = 180)
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -174,8 +182,6 @@ finally {
 
     & sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
     & sc.exe failureflag $ServiceName 1 | Out-Null
-
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $GuardianPath
 }
 
 function Invoke-CodexSmoke {
@@ -287,14 +293,19 @@ try {
     $service = Get-RunnerService
     Install-LocalGuardian -ServiceName $service.Name
 
-    Write-Host '=== Restoring and verifying GitHub runner ===' -ForegroundColor Cyan
+    Write-Host '=== Isolating runner while Codex is tested directly ===' -ForegroundColor Cyan
+    Stop-Service -Name $service.Name -Force -ErrorAction SilentlyContinue
+    Stop-RunnerJobProcesses
+
+    Write-Host '=== Running PowerShell 7 Codex smoke test ===' -ForegroundColor Cyan
+    $codex = Invoke-CodexSmoke
+
+    Write-Host '=== Starting local guardian and restoring GitHub runner ===' -ForegroundColor Cyan
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File $GuardianPath
     $service.Refresh()
     if ($service.Status -ne 'Running') { Start-Service -Name $service.Name }
     Set-Service -Name $service.Name -StartupType Automatic
     $runner = Wait-RunnerOnline -TimeoutSeconds 180
-
-    Write-Host '=== Running PowerShell 7 Codex smoke test ===' -ForegroundColor Cyan
-    $codex = Invoke-CodexSmoke
 
     Write-Host '=== Optionally enabling external Serverspace recovery ===' -ForegroundColor Cyan
     $serverspace = Configure-ServerspaceGuardian
@@ -358,7 +369,7 @@ catch {
         failed_at = [DateTimeOffset]::UtcNow.ToString('o')
         error = $_.Exception.Message
         log = $LogPath
-        note = 'The script attempted to leave the GitHub runner service enabled and running even after failure.'
+        note = 'The local SYSTEM guardian was installed before testing, and the script attempted to leave the GitHub runner service enabled and running even after failure.'
     }
     Write-JsonNoBom -Path $ReportPath -Value $failure
     Write-Host ''
