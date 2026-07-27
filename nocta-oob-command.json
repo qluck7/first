@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-restart-runner-20260727-04",
+  "command_id": "oob-controlled-reboot-20260727-02",
   "enabled": true,
-  "action": "restart_runner",
+  "action": "reboot",
   "params": {
-    "reason": "Force a clean runner reconnect before verifying the queued Codex collector audit"
+    "reason": "Clear the self-hosted runner state after service restart did not accept new Codex audit workflows"
   }
 }
