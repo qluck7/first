@@ -1,7 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-bootstrap-noop-20260727-01",
+  "command_id": "oob-restart-runner-20260727-01",
   "enabled": true,
-  "action": "noop",
-  "params": {}
+  "action": "restart_runner",
+  "params": {
+    "reason": "Post-bootstrap verification and stale worker cleanup"
+  }
 }
