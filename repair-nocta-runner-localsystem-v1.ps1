@@ -131,11 +131,13 @@ if (`$result.status -ne 'PASS') { exit 1 }
     [IO.File]::WriteAllText($SmokeScript,$text,$Utf8NoBom)
     [void][scriptblock]::Create((Get-Content $SmokeScript -Raw))
     Remove-Item $SmokeResult -Force -ErrorAction SilentlyContinue
-    $taskCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$SmokeScript`""
-    & schtasks.exe /Create /TN $SmokeTask /TR $taskCommand /SC ONCE /ST 23:59 /RU SYSTEM /RL HIGHEST /F | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Unable to create $SmokeTask." }
-    & schtasks.exe /Run /TN $SmokeTask | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Unable to start $SmokeTask." }
+
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ("-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"{0}`"" -f $SmokeScript)
+    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddHours(1)
+    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    Register-ScheduledTask -TaskName $SmokeTask -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
+    Start-ScheduledTask -TaskName $SmokeTask
+
     $deadline = (Get-Date).AddSeconds(190)
     while ((Get-Date) -lt $deadline -and -not (Test-Path $SmokeResult)) { Start-Sleep -Seconds 3 }
     if (-not (Test-Path $SmokeResult)) { throw 'SYSTEM Codex smoke result was not created.' }
@@ -148,8 +150,11 @@ try {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run PowerShell as Administrator.' }
-    foreach ($command in @('gh.exe','codex.exe','git.exe','powershell.exe','schtasks.exe','sc.exe','robocopy.exe','icacls.exe')) {
+    foreach ($command in @('gh.exe','codex.exe','git.exe','powershell.exe','robocopy.exe','icacls.exe')) {
         if (-not (Get-Command $command -ErrorAction SilentlyContinue)) { throw "Missing required command: $command" }
+    }
+    foreach ($cmdlet in @('New-ScheduledTaskAction','New-ScheduledTaskTrigger','New-ScheduledTaskPrincipal','Register-ScheduledTask','Start-ScheduledTask')) {
+        if (-not (Get-Command $cmdlet -ErrorAction SilentlyContinue)) { throw "Missing ScheduledTasks cmdlet: $cmdlet" }
     }
     & gh.exe auth status *> $null
     if ($LASTEXITCODE -ne 0) { throw 'GitHub CLI is not authenticated for the Administrator session.' }
