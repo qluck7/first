@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-restart-runner-for-dataset-v3-20260728-01",
+  "command_id": "oob-health-during-dataset-v3-20260728-01",
   "enabled": true,
-  "action": "restart_runner",
+  "action": "health",
   "params": {
-    "reason": "Reconnect the official runner so it can accept the queued required-dataset v3 command"
+    "reason": "Keep the out-of-band channel read-only while required-dataset v3 is actively collecting"
   }
 }
