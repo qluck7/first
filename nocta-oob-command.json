@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-health-after-rdp-recovery-20260728-01",
+  "command_id": "oob-cancel-duplicate-recovery-and-free-runner-20260728-01",
   "enabled": true,
-  "action": "health",
+  "action": "restart_runner",
   "params": {
-    "reason": "Return OOB channel to read-only health after one controlled RDP recovery reboot"
+    "reason": "Terminate the duplicate recovery workflow from closed PR #85 and free the single self-hosted runner for PR #86, which rescues the completed audit commit"
   }
 }
