@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-cancel-duplicate-recovery-and-free-runner-20260728-01",
+  "command_id": "oob-health-after-audit-recovery-20260728-01",
   "enabled": true,
-  "action": "restart_runner",
+  "action": "health",
   "params": {
-    "reason": "Terminate the duplicate recovery workflow from closed PR #85 and free the single self-hosted runner for PR #86, which rescues the completed audit commit"
+    "reason": "Safe read-only state after recovering and integrating the completed Codex MOEX audit"
   }
 }
