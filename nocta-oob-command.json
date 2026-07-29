@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-health-during-dataset-v3-20260728-01",
+  "command_id": "oob-restart-runner-stale-queue-20260729-01",
   "enabled": true,
-  "action": "health",
+  "action": "restart_runner",
   "params": {
-    "reason": "Keep the out-of-band channel read-only while required-dataset v3 is actively collecting"
+    "reason": "Self-hosted jobs have remained queued for hours and no new dataset STARTED/result evidence was published; recover the runner service without rebooting Windows"
   }
 }
