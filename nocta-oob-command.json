@@ -1,9 +1,9 @@
 {
   "schema": "nocta-oob-command/v1",
-  "command_id": "oob-restart-runner-stale-queue-20260729-01",
+  "command_id": "oob-health-after-stale-queue-recovery-20260729-01",
   "enabled": true,
-  "action": "restart_runner",
+  "action": "health",
   "params": {
-    "reason": "Self-hosted jobs have remained queued for hours and no new dataset STARTED/result evidence was published; recover the runner service without rebooting Windows"
+    "reason": "Return the out-of-band channel to read-only health after the runner accepted the queued NOCTA job"
   }
 }
